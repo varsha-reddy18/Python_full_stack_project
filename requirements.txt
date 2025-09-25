@@ -3,3 +3,4 @@ supabase>=2.0.2          #supabse client for database opeartions
 fastapi>=0.104.1         #backend api framework
 uvicorn>=0.24.0          #ASGI Server for fastapi
 python-dotenv>=1.0.0     #Environment variables management
+requests

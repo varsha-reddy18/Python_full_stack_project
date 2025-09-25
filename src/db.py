@@ -1,72 +1,71 @@
-# db.manager.py
 import os
 from supabase import create_client
 from dotenv import load_dotenv
 
-# load enviroment variables from .env file
 load_dotenv()
-url=os.getenv("SUPABASE_URL")
-key=os.getenv("SUPABASE_KEY")
-supabase=create_client(url,key)
-
-# user  table operations
-
-# Create task
-def create_user(name,email,password,role):
-    return supabase.table("users").insert({
-        "name":name,
-        "email":email,
-        "password":password,
-        "role":role,
-    }).execute()
-
-#Get all tasks
-def get_all_users():
-    return supabase.table("users").select("*").execute()
-
-#update task
-def update_user(user_id, name=None, email=None, password=None, role=None):
-    update_data = {}
-    if name: update_data["name"] = name
-    if email: update_data["email"] = email
-    if password: update_data["password"] = password
-    if role: update_data["role"] = role
-    return supabase.table("users").update(update_data).eq("user_id", user_id).execute()
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+supabase = create_client(url, key)
 
 
-#delete task
-def delete_user(user_id):
-    return supabase.table("users").delete().eq("id",user_id).execute()
+class DatabaseManager:
+    def __init__(self):
+        self.client = supabase
 
+    # ---- Users ----
+    def create_user(self, name, email, password, role):
+        return self.client.table("users").insert({
+            "name": name,
+            "email": email,
+            "password": password,
+            "role": role,
+        }).execute()
 
-# Donation table operations
+    def get_all_users(self):
+        return self.client.table("users").select("*").execute()
 
-def create_donation(user_id, food_item, quantity, expiry_date):
-    return supabase.table("donations").insert({
-        "user_id": user_id,
-        "food_item": food_item,
-        "quantity": quantity,
-        "expiry_date": expiry_date
-    }).execute()
-def get_all_donations():
-    return supabase.table("donations").select("*").execute()
-def update_donation_status(donation_id, status):
-    return supabase.table("donations").update({"status": status}).eq("donation_id", donation_id).execute()
-def delete_donation(donation_id):
-    return supabase.table("donations").delete().eq("donation_id", donation_id).execute()
+    def update_user(self, user_id, name=None, email=None, password=None, role=None):
+        update_data = {}
+        if name: update_data["name"] = name
+        if email: update_data["email"] = email
+        if password: update_data["password"] = password
+        if role: update_data["role"] = role
+        return self.client.table("users").update(update_data).eq("user_id", user_id).execute()
 
-# request table operations
+    def delete_user(self, user_id):
+        return self.client.table("users").delete().eq("user_id", user_id).execute()
 
-def create_request(ngo_id, donation_id):
-    return supabase.table("requests").insert({
-        "ngo_id": ngo_id,
-        "donation_id": donation_id,
-        "status": "pending"
-    }).execute()
-def get_requests_by_ngo(ngo_id):
-    return supabase.table("requests").select("*").eq("ngo_id", ngo_id).execute()
-def update_request_status(request_id, status):
-    return supabase.table("requests").update({"status": status}).eq("request_id", request_id).execute()
-def delete_request(request_id):
-    return supabase.table("requests").delete().eq("request_id", request_id).execute()
+    # ---- Donations ----
+    def create_donation(self, user_id, food_item, quantity, expiry_date):
+        return self.client.table("donations").insert({
+            "user_id": user_id,
+            "food_item": food_item,
+            "quantity": quantity,
+            "expiry_date": expiry_date
+        }).execute()
 
+    def get_available_donations(self):
+        return self.client.table("donations").select("*").execute()
+
+    def update_donation_status(self, donation_id, status):
+        return self.client.table("donations").update({"status": status}).eq("donation_id", donation_id).execute()
+
+    def delete_donation(self, donation_id):
+        return self.client.table("donations").delete().eq("donation_id", donation_id).execute()
+
+    # ---- Requests ----
+    def create_request(self, ngo_id, donation_id):
+        return self.client.table("requests").insert({
+            "ngo_id": ngo_id,
+            "donation_id": donation_id,
+            "status": "pending"
+        }).execute()
+
+    def get_requests_by_ngo(self, ngo_id):
+        return self.client.table("requests").select("*").eq("ngo_id", ngo_id).execute()
+
+    def update_request_status(self, request_id, status):
+        return self.client.table("requests").update({"status": status}).eq("request_id", request_id).execute()
+
+    def delete_request(self, request_id):
+        return self.client.table("requests").delete().eq("request_id", request_id).execute()
