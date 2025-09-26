@@ -32,7 +32,7 @@ class UserCreate(BaseModel):
     name: str
     email: str
     password: str
-    role: str
+    role: str  # donor or ngo
 
 class UserUpdate(BaseModel):
     name: str | None = None
@@ -43,10 +43,9 @@ class UserUpdate(BaseModel):
 class DonationCreate(BaseModel):
     user_id: int
     food_item: str
-    quantity: str
+    quantity: int
     expiry_date: str  # YYYY-MM-DD
 
-# ✅ FIXED: use ngo_email instead of ngo_id
 class RequestModel(BaseModel):
     donation_id: int
     ngo_email: str
@@ -94,10 +93,7 @@ def create_donation(donation: DonationCreate):
 
 @app.get("/donations")
 def list_donations():
-    result = donation_manager.get_available_donations()
-    if isinstance(result, dict) and "data" in result:
-        return result["data"]
-    return result
+    return donation_manager.get_available_donations()
 
 @app.put("/donations/{donation_id}/status")
 def update_donation_status(donation_id: int, status: str):
@@ -116,7 +112,7 @@ def delete_donation(donation_id: int):
 # ----------------- REQUESTS -----------------
 @app.post("/requests")
 def create_request(req: RequestModel):
-    # ✅ Look up NGO ID from email
+    # Look up NGO by email
     users = user_manager.get_users()
     ngo_list = [u for u in users if u.get("email") == req.ngo_email and u.get("role") == "ngo"]
 
@@ -124,7 +120,6 @@ def create_request(req: RequestModel):
         raise HTTPException(status_code=404, detail="NGO not found")
 
     ngo_id = ngo_list[0]["user_id"]
-
     result = request_manager.create_request(ngo_id, req.donation_id)
     if not result.get("Success"):
         raise HTTPException(status_code=400, detail=result.get("Message"))
@@ -148,7 +143,7 @@ def delete_request(request_id: int):
         raise HTTPException(status_code=400, detail=result.get("Message"))
     return result
 
-# ------ Run ------
+# ----------------- Run Server -----------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
