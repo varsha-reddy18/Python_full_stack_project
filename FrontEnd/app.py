@@ -1,18 +1,16 @@
 import streamlit as st
 import requests
+from datetime import date
 
 API_URL = "http://127.0.0.1:8000"
 
 # ---------------- Custom CSS ----------------
 st.markdown(f"""
 <style>
-/* Full-page background image */
 .stApp {{
     background: url("file:///{'Screenshot 2025-09-25 212504.png'}") no-repeat center center fixed;
     background-size: cover;
 }}
-
-/* Force full width */
 .block-container {{
     max-width: 100% !important;
     padding-left: 2rem;
@@ -21,8 +19,6 @@ st.markdown(f"""
     border-radius: 10px;
     box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
 }}
-
-/* Title bar */
 .sticky-title {{
     position: sticky;
     top: 0;
@@ -39,8 +35,6 @@ st.markdown(f"""
     display: block;
     box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
 }}
-
-/* Sidebar roles */
 .left-roles .stRadio > div {{
     background-color: #fff;
     padding: 20px;
@@ -53,24 +47,11 @@ st.markdown(f"""
     color: #FF5722 !important;
     margin-left: 5px !important;
 }}
-
-/* Form cards */
-.form-card {{
-    background-color: rgba(255,255,255,0.95);
-    padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
-    margin-bottom: 25px;
-}}
-
-/* Section headers */
 h2, h3 {{
     color: #FF7043;
     font-family: 'Segoe UI', sans-serif;
     margin-top: 15px;
 }}
-
-/* Buttons */
 .stButton>button {{
     background: linear-gradient(90deg, #FF5722, #FF7043);
     color: white;
@@ -85,8 +66,6 @@ h2, h3 {{
 .stButton>button:hover {{
     background: linear-gradient(90deg, #FF7043, #FF8A65);
 }}
-
-/* Donation cards */
 .donation-card {{
     background: linear-gradient(120deg, #FFD54F, #FFB300);
     padding: 15px;
@@ -107,7 +86,6 @@ st.markdown('<div class="sticky-title">🍲 Food Donation and Surplus Management
 
 # ---------------- Layout ----------------
 col_left, col_right = st.columns([1, 3])
-
 with col_left:
     st.markdown('<div class="left-roles">', unsafe_allow_html=True)
     role = st.radio("I am a:", ["Donor", "NGO"])
@@ -132,19 +110,13 @@ def get_users():
 
 def register_user(name, email, password, role):
     response = requests.post(f"{API_URL}/users", json={
-        "name": name,
-        "email": email,
-        "password": password,
-        "role": role,
+        "name": name, "email": email, "password": password, "role": role,
     })
     return safe_json(response)
 
 def add_donation(user_id, item, quantity, expiry):
     response = requests.post(f"{API_URL}/donations", json={
-        "user_id": user_id,
-        "food_item": item,
-        "quantity": quantity,
-        "expiry_date": expiry,
+        "user_id": user_id, "food_item": item, "quantity": quantity, "expiry_date": expiry,
     })
     return safe_json(response)
 
@@ -154,11 +126,34 @@ def get_donations():
         return response.json()
     return []
 
+def update_donation(donation_id, item, quantity, expiry):
+    response = requests.put(f"{API_URL}/donations/{donation_id}/status", params={"status": "available"})
+    return safe_json(response)
+
+def delete_donation(donation_id):
+    response = requests.delete(f"{API_URL}/donations/{donation_id}")
+    return safe_json(response)
+
+def request_donation(donation_id, ngo_email):
+    response = requests.post(f"{API_URL}/requests", json={"donation_id": donation_id, "ngo_email": ngo_email})
+    return safe_json(response)
+
+def get_requests_by_ngo(ngo_id):
+    response = requests.get(f"{API_URL}/requests/{ngo_id}")
+    if response.status_code == 200:
+        return response.json()
+    return []
+
+def cancel_request(request_id):
+    response = requests.delete(f"{API_URL}/requests/{request_id}")
+    return safe_json(response)
+
 # ---------------- Donor Panel ----------------
 if role == "Donor":
     with col_right:
-        st.markdown('<div class="form-card">', unsafe_allow_html=True)
         st.header("👤 Donor Panel")
+
+        # Register
         with st.form("donor_form"):
             name = st.text_input("Name")
             email = st.text_input("Email")
@@ -167,30 +162,47 @@ if role == "Donor":
             if submit:
                 result = register_user(name, email, password, "donor")
                 st.success(result.get("Message", "User registered!"))
-        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="form-card">', unsafe_allow_html=True)
+        # Add donation
         st.subheader("🍱 Add Donation")
         users = get_users()
         donor_ids = [u.get("user_id") for u in users if u.get("role") == "donor"]
-
         if donor_ids:
             donor_id = donor_ids[-1]
             item = st.text_input("Item")
             quantity = st.number_input("Quantity", min_value=1, step=1)
-            expiry = st.date_input("Expiry Date")
+            expiry = st.date_input("Expiry Date", value=date.today())
             if st.button("Add Donation"):
-                result = add_donation(donor_id, item, str(quantity), str(expiry))
+                result = add_donation(donor_id, item, quantity, str(expiry))
                 st.success(result.get("Message", "Donation added!"))
+
+        # View, Update, Remove donations
+        st.subheader("📋 My Donations")
+        my_donations = [d for d in get_donations() if d.get("user_id") in donor_ids]
+        if my_donations:
+            for d in my_donations:
+                with st.expander(f"🍛 {d['food_item']} - {d['quantity']} units (Expiry: {d['expiry_date']})"):
+                    new_item = st.text_input("New Item", value=d["food_item"], key=f"ni{d['donation_id']}")
+                    new_qty = st.number_input("New Qty", value=int(d["quantity"]), key=f"nq{d['donation_id']}")
+                    new_exp = st.date_input("New Expiry", value=date.fromisoformat(d["expiry_date"]), key=f"ne{d['donation_id']}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Save Update", key=f"save{d['donation_id']}"):
+                            result = update_donation(d["donation_id"], new_item, new_qty, str(new_exp))
+                            st.success(result.get("Message", "Donation updated!"))
+                    with col2:
+                        if st.button("Remove", key=f"del{d['donation_id']}"):
+                            result = delete_donation(d["donation_id"])
+                            st.success(result.get("Message", "Donation removed!"))
         else:
-            st.warning("Register as a donor first!")
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.info("No donations yet.")
 
 # ---------------- NGO Panel ----------------
 elif role == "NGO":
     with col_right:
-        st.markdown('<div class="form-card">', unsafe_allow_html=True)
         st.header("🏢 NGO Panel")
+
+        # Register
         with st.form("ngo_form"):
             ngo_name = st.text_input("NGO Name")
             ngo_email = st.text_input("Email")
@@ -199,29 +211,46 @@ elif role == "NGO":
             if submit:
                 result = register_user(ngo_name, ngo_email, password, "ngo")
                 st.success(result.get("Message", "NGO registered!"))
-        st.markdown('</div>', unsafe_allow_html=True)
 
+        # Get NGO ID
+        users = get_users()
+        ngo = next((u for u in users if u.get("email") == ngo_email and u.get("role") == "ngo"), None)
+        ngo_id = ngo["user_id"] if ngo else None
+
+        # View donations
         st.subheader("📦 Available Donations")
         donations = get_donations()
-        if isinstance(donations, list) and donations:
-            for d in donations:
-                if d.get("status") == "available":
-                    col1, col2 = st.columns([3,1])
-                    with col1:
-                        st.markdown(f"""
+        for d in donations:
+            if d.get("status") == "available":
+                col1, col2 = st.columns([3,1])
+                with col1:
+                    st.markdown(f"""
                         <div class="donation-card">
                             🍛 {d['food_item']} - {d['quantity']} units (Expiry: {d['expiry_date']})
                         </div>
-                        """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+                with col2:
+                    if st.button("Select", key=f"req{d['donation_id']}"):
+                        result = request_donation(d["donation_id"], ngo_email)
+                        if result.get("Success"):
+                            st.success("Item requested successfully!")
+                        else:
+                            st.error(result.get("Message", "Request failed!"))
+
+        # View & cancel requests
+        st.subheader("📑 My Requests")
+        if ngo_id:
+            requests_list = get_requests_by_ngo(ngo_id)
+            if requests_list:
+                for r in requests_list:
+                    col1, col2 = st.columns([3,1])
+                    with col1:
+                        st.markdown(f"📌 Donation #{r['donation_id']} requested")
                     with col2:
-                        if st.button("Select", key=f"req{d['donation_id']}"):
-                            response = requests.post(
-                                f"{API_URL}/requests",
-                                json={"donation_id": d["donation_id"], "ngo_email": ngo_email}
-                            )
-                            if response.status_code == 200:
-                                st.success("Item requested successfully!")
-                            else:
-                                st.error(f"Could not request this item: {response.text}")
+                        if st.button("Cancel", key=f"cancel{r['request_id']}"):
+                            result = cancel_request(r["request_id"])
+                            st.success(result.get("Message", "Request cancelled!"))
+            else:
+                st.info("No requests yet.")
         else:
-            st.info("No available items.")
+            st.info("Register as an NGO to view requests.")
